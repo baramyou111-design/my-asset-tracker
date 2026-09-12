@@ -4,8 +4,8 @@ import pandas as pd
 
 # 1. ตั้งค่าหน้าจอ Dashboard
 st.set_page_config(
-    page_title="AI Risk-Adjusted Fund Terminal with News",
-    page_icon="📰",
+    page_title="Ultimate Pro Trading Terminal",
+    page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -24,8 +24,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📰 Risk-Adjusted Fund Terminal + Yahoo News")
-st.markdown("ระบบวิเคราะห์ความเสี่ยง จัดพอร์ตตามความน่าจะเป็น และดึงข่าวสารล่าสุดจาก Yahoo News ประกอบการตัดสินใจ")
+st.title("🚀 Ultimate Pro Trading Terminal & Performance")
+st.markdown("ระบบวิเคราะห์ความเสี่ยง จัดพอร์ตตามความน่าจะเป็น ดึงข่าว Yahoo News และเปรียบเทียบผลตอบแทนสินทรัพย์")
 
 # 2. แผงควบคุมด้านข้าง (Sidebar)
 with st.sidebar:
@@ -43,13 +43,13 @@ with st.sidebar:
     total_capital_thb = st.number_input("เงินทุนรวมทั้งพอร์ต (บาท):", value=100000.0, step=10000.0, format="%.2f")
     
     st.markdown("<br>", unsafe_allow_html=True)
-    scan_button = st.button("🔍 วิเคราะห์ความเสี่ยงและดึงข่าว", type="primary")
+    scan_button = st.button("🔍 วิเคราะห์พอร์ตและเปรียบเทียบตลาด", type="primary")
 
 tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
 
-# 3. ส่วนการประเมินความเสี่ยงและดึงข่าว
+# 3. ส่วนการประมวลผล
 if scan_button:
-    with st.spinner("⏳ กำลังวิเคราะห์ทางเทคนิค ประเมินความเสี่ยง และดึงข่าวล่าสุดจาก Yahoo News..."):
+    with st.spinner("⏳ กำลังดึงข้อมูลตลาดโลก คำนวณความเสี่ยง ดึงข่าว และเทียบผลตอบแทน..."):
         try:
             fx_ticker = yf.Ticker("USDTHB=X")
             fx_hist = fx_ticker.history(period="1d")
@@ -58,23 +58,29 @@ if scan_button:
             usd_thb_rate = 35.0
             
         raw_results = []
+        normalized_history_dict = {}
+        
         for ticker in tickers:
             try:
                 stock = yf.Ticker(ticker)
-                hist = stock.history(period="6mo")
-                if hist.empty or len(hist) < 30:
+                hist = stock.history(period="3mo") # ใช้ย้อนหลัง 3 เดือนสำหรับพล็อตกราฟเปรียบเทียบ
+                if hist.empty or len(hist) < 20:
                     continue
                     
                 current_price = float(hist['Close'].iloc[-1])
                 prev_price = float(hist['Close'].iloc[-2])
                 pct_change = ((current_price - prev_price) / prev_price) * 100
                 
+                # เก็บข้อมูลสำหรับกราฟเปรียบเทียบผลตอบแทน (Normalize เป็นเปอร์เซ็นต์เทียบกับวันแรก)
+                norm_series = (hist['Close'] / hist['Close'].iloc[0]) * 100
+                normalized_history_dict[ticker] = norm_series
+                
                 # ดึงข่าวล่าสุดจาก Yahoo Finance
                 news_list = []
                 try:
                     raw_news = stock.news
                     if raw_news:
-                        for n in raw_news[:3]: # ดึงมาแสดง 3 ข่าวล่าสุด
+                        for n in raw_news[:3]:
                             title = n.get('title', '')
                             link = n.get('link', '#')
                             publisher = n.get('publisher', '')
@@ -128,7 +134,7 @@ if scan_button:
                         signal = "🟡 แนวโน้มขาขึ้นแต่ต้องระวัง (Uptrend)"
                         score = 1.5
                 elif current_price <= curr_sma and current_rsi < 40:
-                    signal = "🟡 อยู่ในโซน Oversold (รอสะสมเผื่อรีบาวด์)"
+                    signal = "🟡 อยู่ในโซน Oversold (รอสะสมรีบาวด์)"
                     score = 1.0
                 else:
                     signal = "🔴 แนวโน้มขาลงความเสี่ยงสูง (ไม่ลงทุน)"
@@ -157,6 +163,7 @@ if scan_button:
         if raw_results:
             total_score = sum([r["score"] for r in raw_results])
             results = []
+            total_allocated_thb = 0.0
             
             for r in raw_results:
                 if total_score > 0 and r["score"] > 0:
@@ -165,6 +172,8 @@ if scan_button:
                 else:
                     weight_pct = 0.0
                     allocated_budget_thb = 0.0
+                
+                total_allocated_thb += allocated_budget_thb
                 
                 target_buy_thb = r["🎯 ราคาเข้าซื้อ"] * (1 if r["is_thai"] else usd_thb_rate)
                 if allocated_budget_thb > 0 and target_buy_thb > 0:
@@ -190,9 +199,19 @@ if scan_button:
                 })
             
             df_results = pd.DataFrame(results)
-            st.success(f"✅ วิเคราะห์และดึงข่าวสำเร็จ! (งบรวมพอร์ต: {total_capital_thb:,.2f} ฿)")
+            cash_remaining = total_capital_thb - total_allocated_thb
             
-            tab1, tab2, tab3 = st.tabs(["🔥 โซนคัดเน้นๆ + ข่าวล่าสุด", "📋 ตารางพอร์ตคัดกรองความเสี่ยง", "⚙️ ดูทั้งหมดรวมตัวถูกตัด"])
+            st.success(f"✅ วิเคราะห์พอร์ตสำเร็จ!")
+            
+            # สรุปภาพรวม Metrics พอร์ต
+            m1, m2, m3 = st.columns(3)
+            m1.metric("💰 เงินทุนรวมทั้งพอร์ต", f"{total_capital_thb:,.2f} ฿")
+            m2.metric("📈 งบที่จัดสรรลงทุนจริง", f"{total_allocated_thb:,.2f} ฿")
+            m3.metric("💵 เงินสดสำรองคงเหลือ", f"{cash_remaining:,.2f} ฿")
+            
+            st.markdown("---")
+            
+            tab1, tab2, tab3, tab4 = st.tabs(["🔥 โซนคัดเน้นๆ + ข่าว", "📈 กราฟเทียบผลตอบแทน", "📋 ตารางพอร์ตคัดกรอง", "⚙️ ดูทั้งหมด"])
             
             with tab1:
                 invest_df = df_results[df_results['งบลงทุน (บาท)'] != "0.00 ฿"]
@@ -207,15 +226,22 @@ if scan_button:
                             c3.metric("งบลงทุนจัดสรร", row['งบลงทุน (บาท)'])
                             c4.metric("จำนวนหน่วย", row['จำนวนหน่วย'])
                             
-                            # แสดงข่าวสารล่าสุดจาก Yahoo News ภายใน Card
                             st.markdown(f"**📰 ข่าวสารล่าสุดจาก Yahoo News:**<br>{row['News']}", unsafe_allow_html=True)
-                            
                             st.line_chart(row['History'], height=200)
                             st.markdown("---")
                 else:
-                    st.warning("⚠️ วันนี้ตลาดมีความเสี่ยงสูง ไม่มีสินทรัพย์ผ่านเกณฑ์ ระบบแนะนำให้ถือเงินสด")
+                    st.warning("⚠️ วันนี้ไม่มีสินทรัพย์ผ่านเกณฑ์ความเสี่ยง แนะนำให้ถือเงินสด")
             
             with tab2:
+                st.subheader("📈 กราฟเปรียบเทียบผลตอบแทนย้อนหลัง (Normalized Performance)")
+                st.markdown("เปรียบเทียบการเติบโตของแต่ละสินทรัพย์ในพอร์ต (ฐานเริ่มต้น = 100%)")
+                if normalized_history_dict:
+                    df_perf = pd.DataFrame(normalized_history_dict)
+                    st.line_chart(df_perf, height=400)
+                else:
+                    st.info("ไม่พบข้อมูลกราฟเปรียบเทียบ")
+            
+            with tab3:
                 st.subheader("📊 ตารางจัดสรรพอร์ต (เฉพาะตัวที่แนะนำให้ลงทุน)")
                 active_df = df_results[df_results['งบลงทุน (บาท)'] != "0.00 ฿"].drop(columns=['History', 'News'])
                 if not active_df.empty:
@@ -223,19 +249,19 @@ if scan_button:
                 else:
                     st.info("ไม่มีสินทรัพย์ผ่านเกณฑ์ในรอบนี้")
                 
-            with tab3:
-                st.subheader("📋 ตารางแสดงผลทั้งหมด (รวมตัวที่ถูกตัดสิทธิ์งบ 0 บาท)")
+            with tab4:
+                st.subheader("📋 ตารางแสดงผลทั้งหมด")
                 full_display_df = df_results.drop(columns=['History', 'News'])
                 st.dataframe(full_display_df, use_container_width=True, height=500, hide_index=True)
                 
                 csv_data = full_display_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    "📥 ดาวน์โหลดรายงาน (CSV)",
+                    "📥 ดาวน์โหลดรายงานพอร์ต (CSV)",
                     data=csv_data,
-                    file_name="risk_adjusted_portfolio_news.csv",
+                    file_name="ultimate_portfolio_report.csv",
                     mime="text/csv"
                 )
         else:
             st.error("❌ ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบรายชื่อสัญลักษณ์ใหม่อีกครั้งครับ")
 else:
-    st.info("👈 กำหนดเงินทุนรวมและรายชื่อสินทรัพย์ด้านซ้าย แล้วกดปุ่ม **'🔍 วิเคราะห์ความเสี่ยงและดึงข่าว'** ได้เลยครับ")
+    st.info("👈 กำหนดเงินทุนรวมและรายชื่อสินทรัพย์ด้านซ้าย แล้วกดปุ่ม **'🔍 วิเคราะห์พอร์ตและเปรียบเทียบตลาด'** ได้เลยครับ")
