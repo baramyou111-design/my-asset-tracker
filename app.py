@@ -5,20 +5,19 @@ import pandas as pd
 # 1. ตั้งค่าหน้าจอ Dashboard
 st.set_page_config(page_title="Pro Trading Terminal", layout="wide", page_icon="📈")
 st.title("🚀 Pro Trading Terminal & Advanced Buy Signals")
-st.markdown("ระบบวิเคราะห์หุ้นและคริปโตแบบเรียลไทม์ พร้อมอินดิเคเตอร์ RSI/MACD, จุด Stop Loss และระบบคำนวณความเสี่ยง")
+st.markdown("ระบบวิเคราะห์หุ้น คริปโต และสินค้าโภคภัณฑ์ (ทองคำ/เงิน/น้ำมัน) แบบเรียลไทม์ พร้อม RSI, MACD และจุด Stop Loss")
 
 # 2. แผงควบคุมด้านข้าง (Sidebar)
-st.sidebar.header("⚙️ ตั้งค่าการติดตามหุ้น")
+st.sidebar.header("⚙️ ตั้งค่าการติดตามสินทรัพย์")
 
-# ช่องพิมพ์รายชื่อหุ้นแทนการอัปโหลดไฟล์
-default_input = "PTT.BK, AOT.BK, CPALL.BK, ADVANC.BK, AAPL, TSLA, NVDA, BTC-USD, ETH-USD"
+# เพิ่มทองคำ เงิน และน้ำมันไว้ในค่าเริ่มต้นให้เลย
+default_input = "PTT.BK, AOT.BK, CPALL.BK, AAPL, TSLA, NVDA, BTC-USD, ETH-USD, GC=F, SI=F, CL=F"
 ticker_input = st.sidebar.text_area(
-    "พิมพ์รายชื่อหุ้นหรือคริปโต (คั่นด้วยจุลภาค ,):",
+    "พิมพ์รายชื่อหุ้น/คริปโต/สินค้าโภคภัณฑ์ (คั่นด้วย ,):",
     default_input,
-    help="หุ้นไทยใส่ .BK, หุ้นนอกพิมพ์ชื่อย่อ, คริปโตใส่ -USD"
+    help="ทองคำ=GC=F, เงิน=SI=F, น้ำมัน=CL=F, หุ้นไทย=.BK, คริปโต=-USD"
 )
 
-# แปลงข้อความให้เป็น List
 tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
 
 st.sidebar.markdown("---")
@@ -28,7 +27,7 @@ risk_pct = st.sidebar.slider("ยอมรับความเสี่ยง�
 
 # 3. ปุ่มเริ่มสแกน
 if st.sidebar.button("🔍 เริ่มสแกนและวิเคราะห์ตลาด", type="primary"):
-    with st.spinner("กำลังดึงข้อมูลตลาดโลกและคำนวณอินดิเคเตอร์ (RSI, MACD, SMA)..."):
+    with st.spinner("กำลังดึงข้อมูลตลาดโลก (หุ้น, คริปโต, ทองคำ, น้ำมัน) และคำนวณอินดิเคเตอร์..."):
         results = []
         for ticker in tickers:
             try:
@@ -63,18 +62,26 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
                 current_signal = float(hist['MACD_Signal'].iloc[-1])
                 
                 # จุด Stop Loss และแนวต้าน
-                stop_loss = current_price * 0.97  # ความเสี่ยง 3%
+                stop_loss = current_price * 0.97
                 resistance = float(hist['High'].rolling(window=20).max().iloc[-1])
                 
-                # คำนวณ Position Sizing (จำนวนเงินที่ควรซื้อ และจำนวนหุ้น)
+                # คำนวณ Position Sizing
                 risk_amount = total_capital * (risk_pct / 100)
                 risk_per_share = current_price - stop_loss
                 suggested_shares = int(risk_amount / risk_per_share) if risk_per_share > 0 else 0
                 suggested_budget = suggested_shares * current_price
                 
-                asset_type = "คริปโต 🪙" if "-USD" in ticker else "หุ้นไทย 🇹🇭" if ".BK" in ticker else "หุ้นต่างประเทศ 🌎"
+                # จำแนกประเภทสินทรัพย์
+                if "-USD" in ticker:
+                    asset_type = "คริปโต 🪙"
+                elif ".BK" in ticker:
+                    asset_type = "หุ้นไทย 🇹🇭"
+                elif "=F" in ticker or "DX-" in ticker:
+                    asset_type = "สินค้าโภคภัณฑ์ 🥇"
+                else:
+                    asset_type = "หุ้นต่างประเทศ 🌎"
                 
-                # เงื่อนไขสัญญาณซื้อ (Breakout + MACD ตัดขึ้น)
+                # เงื่อนไขสัญญาณซื้อ
                 signal = "⚪ รอดูสถานการณ์"
                 if prev_price < prev_sma and current_price > curr_sma and current_macd > current_signal:
                     signal = "🟢 แนะนำซื้อแรง (Strong Buy)"
@@ -114,7 +121,7 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
                     c1.metric("ราคาปัจจุบัน", f"{row['ราคาปัจจุบัน']:.2f}", f"{row['เปลี่ยนแปลง (%)']:.2f}%")
                     c2.metric("RSI Momentum", f"{row['RSI (14)']:.1f}")
                     c3.metric("Stop Loss แนะนำ", f"{row['Stop Loss']:.2f}")
-                    c4.metric("งบลงทุนตามความเสี่ยง", f"{row['งบลงทุนแนะนำ']:,.2f} ({row['จำนวนที่ควรซื้อ']:,} หุ้น)")
+                    c4.metric("งบลงทุนตามความเสี่ยง", f"{row['งบลงทุนแนะนำ']:,.2f} ({row['จำนวนที่ควรซื้อ']:,} หน่วย)")
                     
                     st.line_chart(row['History'])
                     st.markdown("---")
@@ -143,5 +150,4 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
         else:
             st.error("ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบสัญลักษณ์ใหม่อีกครั้งครับ")
 else:
-    st.info("👈 กำหนดรายชื่อหุ้นด้านซ้ายมือ แล้วกดปุ่ม **'🔍 เริ่มสแกนและวิเคราะห์ตลาด'** เพื่อเริ่มต้นใช้งานได้ทันทีครับ!")
-
+    st.info("👈 กำหนดรายชื่อสินทรัพย์ด้านซ้ายมือ แล้วกดปุ่ม **'🔍 เริ่มสแกนและวิเคราะห์ตลาด'** เพื่อเริ่มต้นใช้งานได้ทันทีครับ!")
