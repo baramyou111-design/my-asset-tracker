@@ -4,8 +4,8 @@ import pandas as pd
 
 # 1. ตั้งค่าหน้าจอ Dashboard
 st.set_page_config(page_title="Pro Trading Terminal", layout="wide", page_icon="📈")
-st.title("🚀 Pro Trading Terminal & Target Buy Price")
-st.markdown("ระบบวิเคราะห์หุ้น คริปโต และสินค้าโภคภัณฑ์ พร้อมคำนวณ **ราคาที่ควรเข้าซื้อ (Target Buy)**, RSI, MACD และ Stop Loss")
+st.title("🚀 Pro Trading Terminal & THB Capital Management")
+st.markdown("ระบบวิเคราะห์หุ้น คริปโต และสินค้าโภคภัณฑ์ โดยใช้ **เงินทุนเป็นบาท (THB)** และแปลงสกุลเงินต่างประเทศอัตโนมัติ")
 
 # 2. แผงควบคุมด้านข้าง (Sidebar)
 st.sidebar.header("⚙️ ตั้งค่าการติดตามสินทรัพย์")
@@ -20,13 +20,21 @@ ticker_input = st.sidebar.text_area(
 tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
 
 st.sidebar.markdown("---")
-st.sidebar.header("💰 ระบบคำนวณขนาดพอร์ต (Position Sizing)")
-total_capital = st.sidebar.number_input("เงินทุนทั้งหมด:", value=100000, step=10000)
+st.sidebar.header("💰 ระบบคำนวณขนาดพอร์ต (คิดเป็นเงินบาท)")
+total_capital_thb = st.sidebar.number_input("เงินทุนทั้งหมด (บาท):", value=100000.0, step=10000.0)
 risk_pct = st.sidebar.slider("ยอมรับความเสี่ยงได้สูงสุดต่อไม้ (%):", min_value=0.5, max_value=5.0, value=2.0, step=0.5)
 
 # 3. ปุ่มเริ่มสแกน
 if st.sidebar.button("🔍 เริ่มสแกนและวิเคราะห์ตลาด", type="primary"):
-    with st.spinner("กำลังดึงข้อมูลตลาดโลกและคำนวณราคาเข้าซื้อ..."):
+    with st.spinner("กำลังดึงอัตราแลกเปลี่ยน (USD/THB) และข้อมูลตลาดโลก..."):
+        # ดึงอัตราแลกเปลี่ยน USD/THB ปัจจุบัน
+        try:
+            fx_ticker = yf.Ticker("USDTHB=X")
+            fx_hist = fx_ticker.history(period="1d")
+            usd_thb_rate = float(fx_hist['Close'].iloc[-1]) if not fx_hist.empty else 35.0
+        except Exception:
+            usd_thb_rate = 35.0  # ค่าสำรองกรณีดึงเรทไม่ได้
+            
         results = []
         for ticker in tickers:
             try:
@@ -39,16 +47,15 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
                 prev_price = float(hist['Close'].iloc[-2])
                 pct_change = ((current_price - prev_price) / prev_price) * 100
                 
-                # กำหนดสกุลเงินตามประเภทสินทรัพย์
+                # กำหนดสกุลเงินและตัวแปลงเรทบาท
                 if ".BK" in ticker:
                     currency = "฿"
+                    price_in_thb = current_price
                     asset_type = "หุ้นไทย 🇹🇭"
-                elif "-USD" in ticker or "=F" in ticker or "DX-" in ticker:
-                    currency = "$"
-                    asset_type = "คริปโต 🪙" if "-USD" in ticker else "สินค้าโภคภัณฑ์ 🥇"
                 else:
                     currency = "$"
-                    asset_type = "หุ้นต่างประเทศ 🌎"
+                    price_in_thb = current_price * usd_thb_rate  # แปลงราคาดอลลาร์เป็นบาทเพื่อคำนวณพอร์ต
+                    asset_type = "คริปโต 🪙" if "-USD" in ticker else "สินค้าโภคภัณฑ์ 🥇" if "=F" in ticker or "DX-" in ticker else "หุ้นต่างประเทศ 🌎"
                 
                 # เส้นค่าเฉลี่ย SMA 20 วัน
                 hist['SMA20'] = hist['Close'].rolling(window=20).mean()
@@ -71,19 +78,20 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
                 current_macd = float(hist['MACD'].iloc[-1])
                 current_signal = float(hist['MACD_Signal'].iloc[-1])
                 
-                # คำนวณ "ราคาที่ควรเข้าซื้อ" (Target Buy Price) 
-                # โดยใช้แนวรับ SMA20 หรือจุดย่อตัวสวยๆ (สมมติย่อลงมาใกล้เส้น SMA20 หรือแนวรับระยะสั้น)
+                # ราคาเป้าหมายเข้าซื้อ (Target Buy Price) ในสกุลเงินเดิม
                 target_buy_price = max(curr_sma, current_price * 0.985) if current_price > curr_sma else curr_sma
+                target_buy_thb = target_buy_price * (1 if ".BK" in ticker else usd_thb_rate)
                 
-                # จุด Stop Loss (ต่ำกว่าราคาเข้าซื้อ 3%)
+                # จุด Stop Loss
                 stop_loss = target_buy_price * 0.97
                 resistance = float(hist['High'].rolling(window=20).max().iloc[-1])
                 
-                # คำนวณ Position Sizing
-                risk_amount = total_capital * (risk_pct / 100)
-                risk_per_share = target_buy_price - stop_loss
-                suggested_shares = int(risk_amount / risk_per_share) if risk_per_share > 0 else 0
-                suggested_budget = suggested_shares * target_buy_price
+                # คำนวณ Position Sizing จากเงินทุนบาท
+                risk_amount_thb = total_capital_thb * (risk_pct / 100)
+                risk_per_unit_thb = target_buy_thb - (stop_loss * (1 if ".BK" in ticker else usd_thb_rate))
+                
+                suggested_shares = int(risk_amount_thb / risk_per_unit_thb) if risk_per_unit_thb > 0 else 0
+                suggested_budget_thb = suggested_shares * target_buy_thb
                 
                 # เงื่อนไขสัญญาณซื้อ
                 signal = "⚪ รอดูสถานการณ์"
@@ -94,7 +102,6 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
                 else:
                     signal = "🔴 รอราคาพักตัว (Wait for Dip)"
                 
-                # เก็บค่าแบบจัดฟอร์แมตใส่หน่วยสกุลเงินเรียบร้อย
                 results.append({
                     "สัญลักษณ์": ticker,
                     "ประเภท": asset_type,
@@ -103,8 +110,7 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
                     "🎯 ราคาควรเข้าซื้อ": f"{target_buy_price:,.2f} {currency}",
                     "RSI (14)": f"{current_rsi:.1f}",
                     "Stop Loss": f"{stop_loss:,.2f} {currency}",
-                    "แนวต้าน": f"{resistance:,.2f} {currency}",
-                    "งบลงทุนแนะนำ": f"{suggested_budget:,.2f} {currency}",
+                    "งบลงทุนแนะนำ (บาท)": f"{suggested_budget_thb:,.2f} ฿",
                     "จำนวนที่ควรซื้อ": f"{suggested_shares:,} หน่วย",
                     "คำแนะนำ": signal,
                     "History": hist[['Close', 'SMA20']]
@@ -115,6 +121,7 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
         df_results = pd.DataFrame(results)
         
         if not df_results.empty:
+            st.markdown(f"ℹ️ **อัตราแลกเปลี่ยนอ้างอิงปัจจุบัน:** 1 USD $\approx$ {usd_thb_rate:.2f} THB")
             st.markdown("---")
             buy_df = df_results[df_results['คำแนะนำ'].str.contains("🟢")]
             
@@ -126,21 +133,21 @@ if st.sidebar.button("🔍 เริ่มสแกนและวิเคร�
                     c1.metric("ราคาปัจจุบัน", row['ราคาปัจจุบัน'], row['เปลี่ยนแปลง (%)'])
                     c2.metric("🎯 ราคาควรเข้าซื้อ", row['🎯 ราคาควรเข้าซื้อ'])
                     c3.metric("Stop Loss แนะนำ", row['Stop Loss'])
-                    c4.metric("งบลงทุนตามความเสี่ยง", f"{row['งบลงทุนแนะนำ']} ({row['จำนวนที่ควรซื้อ']})")
+                    c4.metric("งบลงทุนจากพอร์ตบาท", f"{row['งบลงทุนแนะนำ']} ({row['จำนวนที่ควรซื้อ']})")
                     
                     st.line_chart(row['History'])
                     st.markdown("---")
             else:
                 st.info("วันนี้ยังไม่มีสินทรัพย์ตัวไหนเกิดสัญญาณซื้อที่สมบูรณ์ แนะนำให้รอดูสถานการณ์ก่อนครับ")
             
-            st.subheader("📊 ตารางสรุปภาพรวมทั้งหมด & ราคาเป้าหมายเข้าซื้อ")
+            st.subheader("📊 ตารางสรุปภาพรวมทั้งหมด & งบลงทุนเทียบเงินบาท")
             display_df = df_results.drop(columns=['History'])
             
             st.dataframe(display_df, use_container_width=True, height=500, hide_index=True)
             
             csv_data = display_df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 ดาวน์โหลดรายงานการวิเคราะห์ (CSV)", data=csv_data, file_name="pro_trading_report.csv", mime="text/csv")
+            st.download_button("📥 ดาวน์โหลดรายงานการวิเคราะห์ (CSV)", data=csv_data, file_name="thb_trading_report.csv", mime="text/csv")
         else:
             st.error("ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบสัญลักษณ์ใหม่อีกครั้งครับ")
 else:
-    st.info("👈 กำหนดรายชื่อสินทรัพย์ด้านซ้ายมือ แล้วกดปุ่ม **'🔍 เริ่มสแกนและวิเคราะห์ตลาด'** เพื่อเริ่มต้นใช้งานได้ทันทีครับ!")
+    st.info("👈 กำหนดเงินทุนเป็นบาทและรายชื่อสินทรัพย์ด้านซ้ายมือ แล้วกดปุ่ม **'🔍 เริ่มสแกนและวิเคราะห์ตลาด'** เพื่อเริ่มต้นใช้งานได้ทันทีครับ!")
