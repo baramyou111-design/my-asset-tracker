@@ -2,7 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# 1. ตั้งค่าหน้าจอ Dashboard
+# 1. ตั้งค่าหน้าจอ Dashboard (ให้สอดคล้องกับการเลือก Theme)
 st.set_page_config(
     page_title="Ultimate Pro Trading Terminal",
     page_icon="🚀",
@@ -10,46 +10,68 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stButton>button {
-        width: 100%;
-        border-radius: 8px;
-        font-weight: 600;
-        background-color: #2563eb;
-        color: white;
-    }
-    .stButton>button:hover { background-color: #1d4ed8; }
-    </style>
-""", unsafe_allow_html=True)
-
-st.title("🚀 Ultimate Pro Trading Terminal & Performance")
-st.markdown("ระบบวิเคราะห์ความเสี่ยง จัดพอร์ตตามความน่าจะเป็น ดึงข่าว Yahoo News และเปรียบเทียบผลตอบแทนสินทรัพย์")
-
-# 2. แผงควบคุมด้านข้าง (Sidebar)
+# 2. แผงควบคุมด้านข้าง (Sidebar) สำหรับตั้งค่าและเลือก Theme
 with st.sidebar:
-    st.header("⚙️ ตั้งค่าพอร์ตและสินทรัพย์")
+    st.header("⚙️ ตั้งค่าระบบ & ธีม")
+    
+    # ฟีเจอร์เลือก Theme สี
+    theme_mode = st.radio("🎨 เลือกธีมการแสดงผล:", ["Dark Mode 🌙", "Light Mode ☀️"], index=0)
     
     default_input = "PTT.BK, AOT.BK, CPALL.BK, AAPL, TSLA, NVDA, BTC-USD, ETH-USD, GC=F, SI=F, CL=F"
     ticker_input = st.text_area(
         "รายชื่อสินทรัพย์ (คั่นด้วย ,):",
         default_input,
-        height=120
+        height=110
     )
     
     st.markdown("---")
     st.subheader("💰 จัดการเงินทุนรวมพอร์ต")
     total_capital_thb = st.number_input("เงินทุนรวมทั้งพอร์ต (บาท):", value=100000.0, step=10000.0, format="%.2f")
     
+    st.markdown("---")
+    st.subheader("🪙 บันทึกพอร์ตที่ซื้อจริง (Virtual Tracker)")
+    my_entry_asset = st.text_input("ชื่อหุ้นที่ถืออยู่ (เช่น AAPL หรือ PTT.BK):", "AAPL")
+    my_buy_price = st.number_input("ราคาที่คุณซื้อมา (ทุนจริง):", value=180.0, step=1.0)
+    my_shares_held = st.number_input("จำนวนหน่วยที่ถืออยู่:", value=10.0, step=1.0)
+
     st.markdown("<br>", unsafe_allow_html=True)
-    scan_button = st.button("🔍 วิเคราะห์พอร์ตและเปรียบเทียบตลาด", type="primary")
+    scan_button = st.button("🔍 วิเคราะห์พอร์ตและสแกนตลาด", type="primary")
+
+# กำหนด CSS ตามธีมที่ผู้ใช้เลือก
+if "Dark" in theme_mode:
+    bg_color = "#0e1117"
+    text_color = "#ffffff"
+    card_bg = "#1f2937"
+    st.markdown(f"""
+        <style>
+        .main {{ background-color: {bg_color}; color: {text_color}; }}
+        .stButton>button {{
+            width: 100%; border-radius: 8px; font-weight: 600;
+            background-color: #2563eb; color: white;
+        }}
+        .stButton>button:hover {{ background-color: #1d4ed8; }}
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+        .main { background-color: #f8fafc; }
+        .stButton>button {
+            width: 100%; border-radius: 8px; font-weight: 600;
+            background-color: #2563eb; color: white;
+        }
+        .stButton>button:hover { background-color: #1d4ed8; }
+        </style>
+    """, unsafe_allow_html=True)
+
+st.title("🚀 Ultimate Pro Trading Terminal")
+st.markdown("ระบบวิเคราะห์ความเสี่ยง จัดพอร์ตตามความน่าจะเป็น ดึงข่าว Yahoo News เปรียบเทียบผลตอบแทน และคำนวณ Risk/Reward Ratio")
 
 tickers = [t.strip().upper() for t in ticker_input.split(",") if t.strip()]
 
 # 3. ส่วนการประมวลผล
 if scan_button:
-    with st.spinner("⏳ กำลังดึงข้อมูลตลาดโลก คำนวณความเสี่ยง ดึงข่าว และเทียบผลตอบแทน..."):
+    with st.spinner("⏳ กำลังดึงข้อมูลตลาดโลก คำนวณความเสี่ยง และเช็คพอร์ตจริง..."):
         try:
             fx_ticker = yf.Ticker("USDTHB=X")
             fx_hist = fx_ticker.history(period="1d")
@@ -63,7 +85,7 @@ if scan_button:
         for ticker in tickers:
             try:
                 stock = yf.Ticker(ticker)
-                hist = stock.history(period="3mo") # ใช้ย้อนหลัง 3 เดือนสำหรับพล็อตกราฟเปรียบเทียบ
+                hist = stock.history(period="3mo")
                 if hist.empty or len(hist) < 20:
                     continue
                     
@@ -71,7 +93,6 @@ if scan_button:
                 prev_price = float(hist['Close'].iloc[-2])
                 pct_change = ((current_price - prev_price) / prev_price) * 100
                 
-                # เก็บข้อมูลสำหรับกราฟเปรียบเทียบผลตอบแทน (Normalize เป็นเปอร์เซ็นต์เทียบกับวันแรก)
                 norm_series = (hist['Close'] / hist['Close'].iloc[0]) * 100
                 normalized_history_dict[ticker] = norm_series
                 
@@ -123,7 +144,13 @@ if scan_button:
                 
                 target_buy_price = min(current_price, max(curr_sma, current_price * 0.985))
                 stop_loss = target_buy_price * 0.97
-                take_profit_1 = target_buy_price + (target_buy_price - stop_loss) * 1.5
+                take_profit_1 = target_buy_price + (target_buy_price - stop_loss) * 2.0 # ขยับ TP เป็น 1:2 เพื่อความคุ้มค่า
+                
+                # คำนวณ Risk / Reward Ratio (RR)
+                risk = target_buy_price - stop_loss
+                reward = take_profit_1 - target_buy_price
+                rr_ratio = (reward / risk) if risk > 0 else 0.0
+                rr_grade = "🔥 คุ้มค่าสูง (RR > 2.0)" if rr_ratio >= 2.0 else ("👍 พอใช้ได้ (RR > 1.5)" if rr_ratio >= 1.5 else "⚠️ ไม่ค่อยคุ้มเสี่ยง")
                 
                 score = 0.0
                 if current_price > curr_sma and current_macd > current_signal:
@@ -151,7 +178,8 @@ if scan_button:
                     "🎯 ราคาเข้าซื้อ": target_buy_price,
                     "RSI": f"{current_rsi:.1f}",
                     "Stop Loss": f"{stop_loss:,.2f} {currency}",
-                    "Take Profit 1": f"{take_profit_1:,.2f} {currency}",
+                    "Take Profit": f"{take_profit_1:,.2f} {currency}",
+                    "Risk/Reward": f"1 : {rr_ratio:.2f} ({rr_grade})",
                     "score": score,
                     "สถานะ": signal,
                     "News": news_text,
@@ -189,8 +217,9 @@ if scan_button:
                     "เปลี่ยนแปลง (%)": r["เปลี่ยนแปลง (%)"],
                     "🎯 ราคาเข้าซื้อ": f"{r['🎯 ราคาเข้าซื้อ']:,.2f} {r['currency']}",
                     "น้ำหนักพอร์ต (%)": f"{weight_pct:.1f}%",
-                    "RSI": r["RSI"],
+                    "Risk/Reward Ratio": r["Risk/Reward"],
                     "Stop Loss": r["Stop Loss"],
+                    "Take Profit": r["Take Profit"],
                     "งบลงทุน (บาท)": f"{allocated_budget_thb:,.2f} ฿",
                     "จำนวนหน่วย": f"{suggested_shares:,} หน่วย" if r["is_thai"] else f"{suggested_shares:,.4f} หน่วย",
                     "สถานะ": r["สถานะ"],
@@ -201,8 +230,21 @@ if scan_button:
             df_results = pd.DataFrame(results)
             cash_remaining = total_capital_thb - total_allocated_thb
             
-            st.success(f"✅ วิเคราะห์พอร์ตสำเร็จ!")
+            st.success(f"✅ วิเคราะห์พอร์ตสำเร็จเรียบร้อย!")
             
+            # ตรวจสอบคำนวณกำไร-ขาดทุนพอร์ตจริงที่คุณกรอกเข้ามา
+            my_asset_clean = my_entry_asset.strip().upper()
+            matched_asset = df_results[df_results['สัญลักษณ์'] == my_asset_clean]
+            
+            if not matched_asset.empty:
+                # ดึงราคาปัจจุบันที่เป็นตัวเลขออกมาคำนวณ
+                curr_p_str = matched_asset.iloc[0]['ราคาปัจจุบัน'].replace('$', '').replace('฿', '').replace(',', '').strip()
+                curr_p_float = float(curr_p_str)
+                pnl_thb = (curr_p_float - my_buy_price) * my_shares_held * (1 if ".BK" in my_asset_clean else usd_thb_rate)
+                pnl_pct = ((curr_p_float - my_buy_price) / my_buy_price) * 100
+                
+                st.info(f"🪙 **สถานะพอร์ตจริงของคุณ ({my_asset_clean}):** ต้นทุน {my_buy_price:,.2f} | ราคาปัจจุบัน {curr_p_float:,.2f} | กำไร/ขาดทุน: **{pnl_thb:+,.2f} ฿ ({pnl_pct:+.2f}%)**")
+
             # สรุปภาพรวม Metrics พอร์ต
             m1, m2, m3 = st.columns(3)
             m1.metric("💰 เงินทุนรวมทั้งพอร์ต", f"{total_capital_thb:,.2f} ฿")
@@ -223,8 +265,8 @@ if scan_button:
                             c1, c2, c3, c4 = st.columns(4)
                             c1.metric("น้ำหนักพอร์ต", row['น้ำหนักพอร์ต (%)'], row['เปลี่ยนแปลง (%)'])
                             c2.metric("🎯 ราคาควรเข้าซื้อ", row['🎯 ราคาเข้าซื้อ'])
-                            c3.metric("งบลงทุนจัดสรร", row['งบลงทุน (บาท)'])
-                            c4.metric("จำนวนหน่วย", row['จำนวนหน่วย'])
+                            c3.metric("ความคุ้มค่า (R/R)", row['Risk/Reward Ratio'])
+                            c4.metric("งบลงทุนจัดสรร", row['งบลงทุน (บาท)'])
                             
                             st.markdown(f"**📰 ข่าวสารล่าสุดจาก Yahoo News:**<br>{row['News']}", unsafe_allow_html=True)
                             st.line_chart(row['History'], height=200)
@@ -234,7 +276,6 @@ if scan_button:
             
             with tab2:
                 st.subheader("📈 กราฟเปรียบเทียบผลตอบแทนย้อนหลัง (Normalized Performance)")
-                st.markdown("เปรียบเทียบการเติบโตของแต่ละสินทรัพย์ในพอร์ต (ฐานเริ่มต้น = 100%)")
                 if normalized_history_dict:
                     df_perf = pd.DataFrame(normalized_history_dict)
                     st.line_chart(df_perf, height=400)
@@ -264,4 +305,4 @@ if scan_button:
         else:
             st.error("❌ ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบรายชื่อสัญลักษณ์ใหม่อีกครั้งครับ")
 else:
-    st.info("👈 กำหนดเงินทุนรวมและรายชื่อสินทรัพย์ด้านซ้าย แล้วกดปุ่ม **'🔍 วิเคราะห์พอร์ตและเปรียบเทียบตลาด'** ได้เลยครับ")
+    st.info("👈 ตั้งค่าธีม กรอกเงินทุน และใส่รายชื่อสินทรัพย์ด้านซ้าย แล้วกดปุ่ม **'🔍 วิเคราะห์พอร์ตและสแกนตลาด'** ได้เลยครับ")
