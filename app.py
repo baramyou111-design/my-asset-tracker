@@ -2,79 +2,101 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# 1. ตั้งค่าหน้าจอแบบ Mobile-Friendly
+# 1. ตั้งค่าหน้าจอ Mobile-First Layout
 st.set_page_config(
     page_title="Pro Trading Terminal",
-    page_icon="📱",
-    layout="centered", # เปลี่ยนเป็น centered เพื่อให้ดูเหมือนกรอบแอปมือถือ/แท็บเล็ต
-    initial_sidebar_state="collapsed" # พับ Sidebar ไว้โดยอัตโนมัติเพื่อให้เหมือนแอปจริง
+    page_icon="⚡",
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS เพื่อปรับแต่ง UI ให้เป็นสไตล์ Mobile App (ปุ่มมนใหญ่, ฟอนต์สะอาด, ระยะห่างพอดีนิ้วสัมผัส)
+# 2. Custom CSS แต่ง UI ให้ดู Modern โทนม่วงเข้ม/สว่าง สไตล์ Fintech App ล้ำๆ
 st.markdown("""
     <style>
-    .main { background-color: #0b0f19; color: #f3f4f6; }
+    .main {
+        background: linear-gradient(135deg, #0f0c1b 0%, #1a153b 100%);
+        color: #f3f4f6;
+    }
     
-    /* ปรับแต่งปุ่มให้ใหญ่และกดง่ายสไตล์แอปมือถือ */
+    /* การ์ดสไตล์มินิมอล โมเดิร์น */
+    .fintech-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 16px;
+        border-radius: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    /* ปุ่มกดสไตล์แอปมือถือ */
     .stButton>button {
         width: 100%;
-        border-radius: 12px;
+        border-radius: 14px;
         font-weight: 600;
-        height: 48px;
-        background-color: #2563eb;
+        height: 50px;
+        background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
         color: white;
         font-size: 16px;
         border: none;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+        transition: 0.3s;
     }
     .stButton>button:hover {
-        background-color: #1d4ed8;
+        opacity: 0.9;
+        transform: translateY(-2px);
     }
 
-    /* ปรับแต่งกล่อง Metric ให้โค้งมนสวยงามเหมือน Widget มือถือ */
-    [data-testid="stMetric"] {
-        background-color: #1f2937;
-        padding: 14px;
-        border-radius: 14px;
-        border: 1px solid #374151;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-
-    /* ซ่อน Streamlit Menu ด้านบนและ Footer เพื่อความเหมือนแอปแท้ */
-#     #MainMenu {visibility: hidden;}
+    /* ซ่อนเมนู Streamlit ด้านบน */
     footer {visibility: hidden;}
     header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# ส่วนหัวแอปสไตล์ Mobile App Header
+# 3. ส่วนหัวแอป (Header สไตล์ App)
 st.markdown("""
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
-        <h2 style="margin: 0; font-size: 22px;">📱 Pro Trading App</h2>
-        <span style="font-size: 14px; color: #22c55e; background: #064e3b; padding: 4px 10px; border-radius: 20px;">● Live Online</span>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0 20px 0;">
+        <div>
+            <span style="font-size: 13px; color: #a855f7; font-weight: 600;">⚡ SMART TERMINAL</span>
+            <h2 style="margin: 0; font-size: 22px; color: #ffffff;">พอร์ต & ตลาดหุ้น</h2>
+        </div>
+        <div style="background: rgba(168, 85, 247, 0.2); padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(168, 85, 247, 0.4);">
+            <span style="font-size: 12px; color: #c084fc;">● Live Sync</span>
+        </div>
     </div>
 """, unsafe_allow_html=True)
 
-# 2. แผงตั้งค่า (ซ่อนอยู่ใน Expandable Menu เพื่อความสะอาดตาแบบแอป)
-with st.expander("⚙️ ตั้งค่าพอร์ต เงินทุน และสินทรัพย์", expanded=True):
+# 4. ฟีเจอร์จำลองโพลความเห็นตลาด (ตามภาพตัวอย่าง)
+st.markdown("""
+    <div class="fintech-card">
+        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+            <span style="background: #ef4444; color: white; font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: bold; margin-right: 6px;">🔥 มาแรง</span>
+            <span style="font-size: 15px; font-weight: bold; color: #fff;">ดอกเบี้ยจะขึ้นหรือไม่?</span>
+        </div>
+        <div style="font-size: 13px; color: #9ca3af; margin-bottom: 6px;">ขึ้น ↗ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>81%</b></div>
+        <div style="background: #374151; border-radius: 10px; height: 8px; width: 100%; margin-bottom: 8px;">
+            <div style="background: linear-gradient(90deg, #8b5cf6, #ec4899); width: 81%; height: 8px; border-radius: 10px;"></div>
+        </div>
+        <div style="font-size: 13px; color: #9ca3af; margin-bottom: 4px;">คงที่ ➔ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>19%</b></div>
+    </div>
+""", unsafe_allow_html=True)
+
+# 5. แผงตั้งค่าพับได้ (Expander)
+with st.expander("⚙️ ตั้งค่าพอร์ต เงินทุน และสินทรัพย์", expanded=False):
     default_input = "PTT.BK, AOT.BK, AAPL, TSLA, BTC-USD, GC=F"
-    ticker_input = st.text_area(
-        "รายชื่อสินทรัพย์ (คั่นด้วย ,):",
-        default_input,
-        height=80
-    )
+    ticker_input = st.text_area("รายชื่อสินทรัพย์ (คั่นด้วย ,):", default_input, height=80)
     total_capital_thb = st.number_input("เงินทุนรวมทั้งพอร์ต (บาท):", value=100000.0, step=10000.0, format="%.2f")
     my_entry_asset = st.text_input("หุ้นที่ถืออยู่จริง (Tracker):", "AAPL")
     my_buy_price = st.number_input("ทุนจริง:", value=180.0, step=1.0)
     my_shares_held = st.number_input("จำนวนหน่วย:", value=10.0, step=1.0)
 
-scan_button = st.button("🚀 สแกนตลาด & จัดพอร์ต")
+scan_button = st.button("🚀 สแกนตลาด & จัดสรรพอร์ต")
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
-# 3. ส่วนการประมวลผล
+# 6. ส่วนการประมวลผลและการแสดงผล
 if scan_button:
-    with st.spinner("⏳ กำลังโหลดข้อมูล..."):
+    with st.spinner("⏳ กำลังประมวลผลระบบ AI..."):
         try:
             fx_ticker = yf.Ticker("USDTHB=X")
             fx_hist = fx_ticker.history(period="1d")
@@ -222,19 +244,29 @@ if scan_button:
             
             df_results = pd.DataFrame(results)
             
-            # แสดงผลแบบ Tab ย่อยสไตล์แอปมือถือ
-            tab1, tab2 = st.tabs(["🔥 หุ้นน่าซื้อ", "📊 พอร์ตทั้งหมด"])
+            # แท็บเมนูสไตล์แอปมือถือ
+            tab1, tab2 = st.tabs(["🔥 หุ้นน่าซื้อ (Top Picks)", "📊 ภาพรวมพอร์ต"])
             
             with tab1:
                 invest_df = df_results[df_results['งบลงทุน'] != "0 ฿"]
                 if not invest_df.empty:
                     for _, row in invest_df.iterrows():
-                        with st.container():
-                            st.markdown(f"### 📌 {row['สัญลักษณ์']} <span style='font-size:14px; color:#22c55e;'>{row['สถานะ']}</span>", unsafe_allow_html=True)
-                            c1, c2 = st.columns(2)
-                            c1.metric("ราคาปัจจุบัน", row['ราคา'], row['เปลี่ยน (%)'])
-                            c2.metric("งบจัดสรร (บาท)", row['งบลงทุน'], f"สัดส่วน {row['น้ำหนัก (%)']}")
-                            st.markdown("---")
+                        st.markdown(f"""
+                            <div class="fintech-card">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="font-weight: bold; font-size: 16px; color: #fff;">{row['สัญลักษณ์']}</span>
+                                    <span style="background: rgba(34, 197, 94, 0.2); color: #4ade80; font-size: 12px; padding: 2px 8px; border-radius: 6px;">{row['สถานะ']}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 14px; color: #9ca3af; margin-bottom: 4px;">
+                                    <span>ราคา: <b style="color:#fff;">{row['ราคา']}</b></span>
+                                    <span>เปลี่ยน: <b style="color:#22c55e;">{row['เปลี่ยน (%)']}</b></span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 14px; color: #9ca3af;">
+                                    <span>งบจัดสรร: <b style="color:#c084fc;">{row['งบลงทุน']}</b></span>
+                                    <span>สัดส่วน: <b style="color:#fff;">{row['น้ำหนัก (%)']}</b></span>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
                 else:
                     st.info("💡 วันนี้ไม่มีสินทรัพย์เข้าเกณฑ์ ถือเงินสดปลอดภัยที่สุด")
             
@@ -243,4 +275,43 @@ if scan_button:
         else:
             st.error("❌ ไม่พบข้อมูลสินทรัพย์")
 else:
-    st.info("👆 กดปุ่ม **'🚀 สแกนตลาด & จัดพอร์ต'** เพื่อเริ่มใช้งานระบบได้ทันทีครับ")
+    st.info("👆 กดปุ่ม **'🚀 สแกนตลาด & จัดสรรพอร์ต'** ด้านบนเพื่อเริ่มต้นใช้งานแอปพลิเคชัน")
+
+# 7. เมนูด้านล่างแบบลอยตัว (Bottom Navigation Bar สไตล์แอปมือถือ)
+st.markdown("""
+    <style>
+    .bottom-nav {
+        position: fixed;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        max-width: 400px;
+        background: rgba(31, 41, 55, 0.85);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        justify-content: space-around;
+        padding: 10px 0;
+        border-radius: 30px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        z-index: 999;
+    }
+    .nav-item {
+        color: #9ca3af;
+        text-align: center;
+        font-size: 11px;
+        text-decoration: none;
+    }
+    .nav-item.active {
+        color: #a855f7;
+        font-weight: bold;
+    }
+    </style>
+    <div class="bottom-nav">
+        <div class="nav-item active">🏠 หน้าแรก</div>
+        <div class="nav-item">⭐ วอทช์ลิสต์</div>
+        <div class="nav-item">📊 วิเคราะห์</div>
+        <div class="nav-item">👤 พอร์ตของฉัน</div>
+    </div>
+""", unsafe_allow_html=True)
